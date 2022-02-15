@@ -76,6 +76,7 @@ Mesh MeshReader::readOff(const std::string& filename)
     cout << "\tRead the first line and got amount of vertices and faces: " << vSize << " " << fSize << endl;
     Mesh result;
     result.vertices.resize(vSize);
+    
     result.faces.resize(fSize);
 
     for (int i = 0; i < vSize; i++)

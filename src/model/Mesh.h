@@ -411,7 +411,7 @@ void Mesh::fuzzyCluster(std::vector<int> &vs, std::map<int, int> &part, int &fuz
             int v = vs[t];
             float a_fi = distance[v][repA], b_fi = distance[v][repB];
             prob[t] = a_fi / (a_fi + b_fi); //记录了当前面片属于区域B的概率
-        }
+        }       
 
         //重新计算种子面片
         int lastA = repA, lastB = repB;
