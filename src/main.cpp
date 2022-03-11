@@ -1,7 +1,7 @@
 
 #include <iostream>
 #include "MeshReader.h"
-#include "MeshWriter.h"
+#include "MeshWriter.h"    
 #include "model/Mesh.h"
 
 using namespace std;
@@ -21,13 +21,15 @@ int main(int argc, char **argv)
     if(argc == 4) obj2off(argv[1], argv[2]); 
     else {
         cout << "Reading file " << argv[1] << endl;
-        Mesh mesh = MeshReader::readObj(argv[1]);
+        Mesh mesh = MeshReader::readOff(argv[1]);
         //1.预处理阶段
         mesh.getDual();
         mesh.compDist();
         //2.区域分割
-        mesh.solve();
-        
+        // mesh.solve();
+
+        // mesh.ShapeIndex();
+
         mesh.writeOff(argv[2]);
     }
     

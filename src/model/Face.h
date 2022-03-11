@@ -36,6 +36,7 @@ public:
     Indices indices;
     std::vector<Face*> neighbors;
     std::vector<DualEdge> dedges;  // Neighbor faces for Graph Cut
+    std::vector<double> Angs; // 各顶点的内角
 
     Point normal;
     Point center;

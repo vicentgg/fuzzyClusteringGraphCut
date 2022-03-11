@@ -10,6 +10,7 @@
 #include <cassert>
 
 /** Contains integer indices of vertices for each face */
+//计算每个面的顶点整数索引
 class Indices
 {
 public:

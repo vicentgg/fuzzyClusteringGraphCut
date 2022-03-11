@@ -28,7 +28,6 @@ Mesh MeshReader::readObj(const std::string& filename) {
     vector<string> tmp;
     int v1, v2, v3;
 
-
     Mesh result;
 
     while(getline(file, line)) {
@@ -94,6 +93,16 @@ Mesh MeshReader::readOff(const std::string& filename)
         tmp = split(line, " ");
         Indices indices(stoi(tmp[1]), stoi(tmp[2]), stoi(tmp[3]));
         result.faces[i] = Face(indices, result.vertices[indices[0]].p, result.vertices[indices[1]].p, result.vertices[indices[2]].p);
+
+        result.vertices[indices[0]].neighbor_face.push_back(i);
+
+
+        result.vertices[indices[1]].neighbor_face.push_back(i);
+
+
+        result.vertices[indices[2]].neighbor_face.push_back(i);
+
+
     }
 
     cout << "\tRead all faces" << endl;
