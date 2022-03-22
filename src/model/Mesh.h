@@ -2,6 +2,7 @@
 #define MESHSEGMENTATION_MESH_H
 
 #include <vector>
+#include <time.h>
 #include <cstdlib>
 #include <map>
 #include <fstream>
@@ -15,10 +16,11 @@
 
 #define EPSILON 1e-12
 #define INF_FLOAT 1e12
-#define FUZZY_REGION 0.05 //模糊区域概率范围
+#define FUZZY_REGION 0 //模糊区域概率范围
 #define FUZZY -2
 #define REPA -3
 #define REPB -1
+#define PI acos(-1)
 
 typedef std::pair<float, int> fipair;
 
@@ -172,9 +174,20 @@ double Mesh::geoDist(const Face &a, const Face &b, const std::vector<int> &commo
 }
 
 
+// 获取当前系统时间
+inline int64_t getCurrentLocalTimeStamp()
+{
+    std::chrono::time_point<std::chrono::system_clock, std::chrono::milliseconds> tp = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+    auto tmp = std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch());
+    return tmp.count();
+}
+
+
 //计算顶点的形状指数 
 //分别计算顶点的高斯曲率与平均曲率
 double Mesh::ShapeIndex() {
+    int64_t start_time = getCurrentLocalTimeStamp();
+
     int num_verts = vertices.size();
 
     for(int i = 0; i < num_verts; i ++) {
@@ -204,21 +217,27 @@ double Mesh::ShapeIndex() {
             
             Point p = vertices[a[v]].p, p1 = vertices[a[v1]].p, p2 = vertices[a[v2]].p;
             Point n1 = p1 - p, n2 = p2 - p;
+            util::normalizeV(n1);
+            util::normalizeV(n2);
             float l1 = vlen(n1), l2 = vlen(n2);
+
 
             double l1_l2 = util::dot(n1, n2) / (l1*l2);
             l1_l2 = std::clamp(l1_l2, -1., 1.);
             double angle = acos(l1_l2);
             vertices[i].neighbor_angle.emplace(vertices[i].neighbor_face[j], angle);
 
-            double s = l1*l2*sin(angle)/2;
-
             vert_n = vert_n + face.normal;
             sum_angle += angle;
+
+            if(angle > PI / 2) angle = PI - angle;
+            double s = l1*l2*sin(angle)/2;
+
             sum_s += s;
         }
 
-        vertices[i].gaus = (2 * 3.14 - sum_angle) / sum_s; //高斯曲率
+        std::cout << "sum_angle " << sum_angle << std::endl;
+        vertices[i].gaus = 3 * (2 * PI - sum_angle) / sum_s; //高斯曲率
         std::cout << "gaus " << vertices[i].gaus << std::endl;
         vert_n = vert_n / vertices[i].neighbor_face.size();
         vertices[i].normal = vert_n;  //顶点法向量
@@ -230,7 +249,7 @@ double Mesh::ShapeIndex() {
     //计算平均曲率
     for(int i = 0; i < num_verts; i ++) {
 
-        double avrage= 0;
+        double avrage = 0;
 
         for(int j = 0, len = vertices[i].neighbor_face.size(); j < len; j ++) {
 
@@ -242,13 +261,15 @@ double Mesh::ShapeIndex() {
                 if(a[v] == i) break;
             }
 
+
             for(int k = 0, len = vertices[i].neighbor_face.size(); k < len; k ++) {
                 if(k != j) {
                     const Face &face = faces[vertices[i].neighbor_face[k]];
                     Indices b = face.indices;
-
                     std::vector<int> common;
+
                     if (isNeighFace(faces[j], faces[k], common)) {
+
                         int pair;
                         for(auto com : common) {
                             if(com != a[v]) pair = com;
@@ -271,32 +292,38 @@ double Mesh::ShapeIndex() {
 
                         Point n1 = vertices[pair].p - vertices[a[v]].p;
                         util::normalizeV(n1);
-                        double vert_n_n1 = util::dot(vertices[a[v]].normal, n1);
+                        Point normal = vertices[a[v]].normal;
+                        util::normalizeV(normal);
+                        double vert_n_n1 = util::dot(normal, n1);
+                        // std::cout << "vert_n_n1: " << vert_n_n1 << std::endl;
                         double l_angle = vertices[l].neighbor_angle[vertices[i].neighbor_face[j]];
 
                         double r_angle = vertices[r].neighbor_angle[vertices[i].neighbor_face[k]];
 
                         double cot_ab = (1/tan(l_angle) + 1/tan(r_angle)) / 2;
-                        // std::cout << "cot_ab " << cot_ab << std::endl;
-
+                        // std::cout << "cot_ab: " << cot_ab << std::endl;
                         avrage = avrage + (cot_ab*vert_n_n1);
                     }
                 }
             }
         }
-
-        vertices[i].avrage = avrage / (4 * vertices[i].s);
-        std::cout << " avrage" << vertices[i].avrage << std::endl;
+        // std::cout << "vertices[i].avrage: " << avrage << std::endl;
+        // std::cout << "vertices[i].s: " << vertices[i].s << std::endl;
+        vertices[i].avrage = avrage * 3 / (4 * vertices[i].s);
+        
     }
 
 
 //计算顶点的形状指数
-     for(int i = 0; i < num_verts; i ++) {
+    for(int i = 0; i < num_verts; i ++) {
+        
+        double t = 0.5 - atan(vertices[i].avrage / sqrt(abs(vertices[i].avrage * vertices[i].avrage - vertices[i].gaus))) / PI;
+        // std::cout << " avrage:" << vertices[i].avrage << " gaus:" << vertices[i].gaus << " type:" << t << std::endl;
+        vertices[i].index = t;
+    }
 
-         double t = 0.5 - atan(vertices[i].avrage / sqrt(vertices[i].avrage * vertices[i].avrage - vertices[i].gaus)) / 3.14;
-        //  std::cout << " t " << t <<std::endl;
-         vertices[i].index = t;
-     }
+    int64_t end_time = getCurrentLocalTimeStamp();
+    // std::cout << "形状信息统计：" << end_time - start_time << std::endl; 
 
     return 0;
 }
@@ -307,6 +334,8 @@ double Mesh::ShapeIndex() {
 //1.1 计算每个面片与相邻面片之间的角度距离与测地距离 然后建立网格的对偶图 使用相邻面片的角度距离和测地距离计算对偶图中每个边缘的权重
 void Mesh::getDual()
 {
+    int64_t start_time = getCurrentLocalTimeStamp();
+
     int num_neigh = 0;
     num_faces = faces.size();
     double tot_angle_dist = 0.0f, tot_geo_dist = 0.0f;
@@ -350,6 +379,13 @@ void Mesh::getDual()
     std::cout << "Num neighbor faces " << num_neigh << std::endl;
     std::cout << "Avg Angle dist " << avg_angle_dist << std::endl;
     std::cout << "Avg Geo dist " << avg_geo_dist << std::endl;
+
+
+    ShapeIndex();
+
+    int64_t end_time = getCurrentLocalTimeStamp();
+
+    std::cout << "包含曲率的特征提取耗时：" << end_time - start_time << "ms" << std::endl;
 }
 
 //1.2 预处理阶段，计算对偶图中所有顶点之间的最近距离 计算每个面片到其他面片的最短路径
@@ -359,6 +395,7 @@ void Mesh::compDist()
      * 目前这块地方的性能损失较大
      * 还有优化的空间
      */
+    int64_t start_time = getCurrentLocalTimeStamp();
     for (int i = 0; i < num_faces; i++)
     {
         std::vector<float> tmp_dist(num_faces, INF_FLOAT); //建立最短路径数组 初始值设为最大 下标为对应的面片
@@ -366,6 +403,9 @@ void Mesh::compDist()
         distance.push_back(tmp_dist);
     }
     std::cout << "Finish computing shortest path" << std::endl;
+    int64_t end_time = getCurrentLocalTimeStamp();
+
+    std::cout << "对偶图构建耗时：" << end_time - start_time << "ms" << std::endl;
 
     float max_float = 0;
     for(int i = 0; i < num_faces; i ++) {
@@ -406,6 +446,7 @@ void Mesh::compDist()
                 v_map[visited[i]] = num;
             }
         }
+        
 
         for(auto &map_visited : v_map) {
             std::vector<int> vs = map_visited.second;
@@ -538,9 +579,14 @@ void Mesh::meshSeg(int depth, int id, std::vector<int> &vs,
         }
         return;
     }
+    
+    int64_t start_time = getCurrentLocalTimeStamp();
 
     //2.1 进行模糊聚类 将网格划分为三个区域 区域A 区域B 和模糊区域
     fuzzyCluster(vs, part, fuzzy, repA, repB);
+
+    int64_t end_time = getCurrentLocalTimeStamp();
+    std::cout << "一次聚类耗时：" << end_time - start_time << "ms" << std::endl;
 
     // //2.3 模糊区域面片数量不为0时 使用最小割方法 寻找准确边界
     if (fuzzy != 0)
@@ -557,7 +603,7 @@ void Mesh::meshSeg(int depth, int id, std::vector<int> &vs,
 
     
     //当递归深度到达一定时 直接对区域的网格按照上述分割结果打标签 不再继续进行分割
-    if (depth >= 1)
+    if (depth >= 3)
     {
         int pa = 0, pb = 0;
         for (int v: vs)
@@ -794,11 +840,10 @@ void Mesh::writeOff(const std::string &filename)
     for (auto &f : faces)
     {
         file << "3 " << f.indices.x << " " << f.indices.y << " " << f.indices.z << " ";
-        // int t = (reType(vertices[f.indices[0]].index)+reType(vertices[f.indices[1]].index)+reType(vertices[f.indices[2]].index))/3;
-        // file << 60 * (t % 4 + 1) << " " << 80 * ((t + 1) % 3 + 1) << " " << 50 * ((t + 2) % 5 + 1) << std::endl;
-        // file << 60 * (visited_par[i] % 4 + 1) << " " << 80 * ((visited_par[i] + 1) % 3 + 1) << " " << 50 * ((visited_par[i] + 2) % 5 + 1) << std::endl;
+        int t = (reType(vertices[f.indices[0]].index)+reType(vertices[f.indices[1]].index)+reType(vertices[f.indices[2]].index))/3;
+        file << 10 * (t + 1) << " " << 15 * (t + 1) << " " << 20 * (t + 2) << std::endl;
 
-        file << 60 * (partition[i] % 4 + 1) << " " << 80 * ((partition[i] + 1) % 3 + 1) << " " << 50 * ((partition[i] + 2) % 5 + 1) << std::endl;
+        // file << 60 * (partition[i] % 4 + 1) << " " << 80 * ((partition[i] + 1) % 3 + 1) << " " << 50 * ((partition[i] + 2) % 5 + 1) << std::endl;
         i++;
     }
 }

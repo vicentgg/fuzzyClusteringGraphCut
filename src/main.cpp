@@ -23,12 +23,12 @@ int main(int argc, char **argv)
         cout << "Reading file " << argv[1] << endl;
         Mesh mesh = MeshReader::readOff(argv[1]);
         //1.预处理阶段
-        mesh.getDual();
-        mesh.compDist();
+        // mesh.getDual();
+        // mesh.compDist();
         //2.区域分割
         // mesh.solve();
 
-        // mesh.ShapeIndex();
+        mesh.ShapeIndex();
 
         mesh.writeOff(argv[2]);
     }
